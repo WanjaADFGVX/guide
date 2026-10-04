@@ -224,8 +224,119 @@ function isTextAnswerCorrect(userText, acceptableAnswers) {
   return false;
 }
 
+// -------------------------------------------------------------
+// SEMANTIC EMBEDDINGS (ML FALLBACK)
+// -------------------------------------------------------------
+const ENABLE_SEMANTIC_FALLBACK = process.env.ENABLE_SEMANTIC_FALLBACK !== 'false';
+const SEMANTIC_SIMILARITY_THRESHOLD = parseFloat(process.env.SEMANTIC_SIMILARITY_THRESHOLD) || 0.72;
+
+let featureExtractor = null;
+let mlLoadingPromise = null;
+const embeddingCache = new Map();
+
+async function getFeatureExtractor() {
+  if (featureExtractor) return featureExtractor;
+  if (mlLoadingPromise) return mlLoadingPromise;
+
+  mlLoadingPromise = (async () => {
+    try {
+      console.log('[ML] Loading Xenova/paraphrase-multilingual-MiniLM-L12-v2 pipeline...');
+      const { pipeline } = await import('@xenova/transformers');
+      featureExtractor = await pipeline('feature-extraction', 'Xenova/paraphrase-multilingual-MiniLM-L12-v2', {
+        quantized: true
+      });
+      console.log('[ML] Semantic model loaded successfully');
+      return featureExtractor;
+    } catch (err) {
+      console.warn('[ML] Failed to load semantic model, falling back to rule-based only:', err.message);
+      featureExtractor = null;
+      return null;
+    } finally {
+      mlLoadingPromise = null;
+    }
+  })();
+
+  return mlLoadingPromise;
+}
+
+// Pre-warm model in background if enabled
+if (ENABLE_SEMANTIC_FALLBACK) {
+  setTimeout(() => {
+    getFeatureExtractor().catch(() => {});
+  }, 1000);
+}
+
+async function getEmbedding(text) {
+  const clean = String(text || '').trim();
+  if (!clean) return null;
+  if (embeddingCache.has(clean)) return embeddingCache.get(clean);
+
+  const extractor = await getFeatureExtractor();
+  if (!extractor) return null;
+
+  try {
+    const out = await extractor(clean, { pooling: 'mean', normalize: true });
+    const vec = out.data;
+    if (embeddingCache.size > 2000) {
+      const keys = embeddingCache.keys();
+      for (let i = 0; i < 500; i++) embeddingCache.delete(keys.next().value);
+    }
+    embeddingCache.set(clean, vec);
+    return vec;
+  } catch (err) {
+    console.error('[ML] Error computing embedding for text:', clean, err);
+    return null;
+  }
+}
+
+function computeCosineSimilarity(vecA, vecB) {
+  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dot += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : (dot / denom);
+}
+
+async function isTextAnswerCorrectHybrid(userText, acceptableAnswers) {
+  // 1. Fast path: Rule-based
+  if (isTextAnswerCorrect(userText, acceptableAnswers)) {
+    return { isCorrect: true, method: 'rule-based' };
+  }
+
+  // 2. ML Semantic Fallback
+  if (!ENABLE_SEMANTIC_FALLBACK || !userText || !acceptableAnswers || !acceptableAnswers.length) {
+    return { isCorrect: false, method: 'none' };
+  }
+
+  const userVec = await getEmbedding(userText);
+  if (!userVec) return { isCorrect: false, method: 'none' };
+
+  let maxSimilarity = 0;
+  for (const variant of acceptableAnswers) {
+    const varText = String(variant || '').trim();
+    if (!varText) continue;
+    const refVec = await getEmbedding(varText);
+    if (!refVec) continue;
+
+    const sim = computeCosineSimilarity(userVec, refVec);
+    if (sim > maxSimilarity) maxSimilarity = sim;
+
+    if (sim >= SEMANTIC_SIMILARITY_THRESHOLD) {
+      return { isCorrect: true, method: 'semantic', similarity: sim };
+    }
+  }
+
+  return { isCorrect: false, similarity: maxSimilarity, method: 'semantic' };
+}
+
 // Check single question on-the-fly (for immediate "Ответить" feedback)
-app.post('/api/quiz/check-question', (req, res) => {
+app.post('/api/quiz/check-question', async (req, res) => {
   const { quizId, questionId, answer } = req.body;
   if (!quizId || !questionId) {
     return res.status(400).json({ error: 'Некорректные параметры' });
@@ -247,12 +358,15 @@ app.post('/api/quiz/check-question', (req, res) => {
     else if (Array.isArray(q.correctAnswers) && typeof q.correctAnswers[0] === 'string') acceptable = q.correctAnswers;
     else if (Array.isArray(q.options) && q.options.length) acceptable = q.options;
 
-    isCorrect = isTextAnswerCorrect(userText, acceptable);
+    const evalResult = await isTextAnswerCorrectHybrid(userText, acceptable);
+    isCorrect = evalResult.isCorrect;
 
     return res.json({
       questionId: q.id,
       type: 'text',
       isCorrect,
+      method: evalResult.method,
+      similarity: evalResult.similarity,
       userAnswerText: userText,
       acceptableAnswers: acceptable,
       explanation: q.explanation || ''
@@ -277,7 +391,7 @@ app.post('/api/quiz/check-question', (req, res) => {
 });
 
 // 2. Evaluate submitted quiz
-app.post('/api/quiz/evaluate', (req, res) => {
+app.post('/api/quiz/evaluate', async (req, res) => {
   const { quizId, answers } = req.body;
   if (!quizId || !answers) {
     return res.status(400).json({ error: 'Некорректные данные для проверки' });
@@ -293,7 +407,7 @@ app.post('/api/quiz/evaluate', (req, res) => {
   const totalQuestions = quiz.questions.length;
   const results = [];
 
-  quiz.questions.forEach(q => {
+  for (const q of quiz.questions) {
     let isCorrect = false;
 
     if (q.type === 'text') {
@@ -310,7 +424,8 @@ app.post('/api/quiz/evaluate', (req, res) => {
         acceptable = q.options;
       }
 
-      isCorrect = isTextAnswerCorrect(userText, acceptable);
+      const evalResult = await isTextAnswerCorrectHybrid(userText, acceptable);
+      isCorrect = evalResult.isCorrect;
 
       if (isCorrect) correctCount++;
 
@@ -321,9 +436,11 @@ app.post('/api/quiz/evaluate', (req, res) => {
         userAnswerText: userText,
         acceptableAnswers: acceptable,
         isCorrect,
+        method: evalResult.method,
+        similarity: evalResult.similarity,
         explanation: q.explanation || ''
       });
-      return;
+      continue;
     }
 
     // single or multiple choice
@@ -345,7 +462,7 @@ app.post('/api/quiz/evaluate', (req, res) => {
       isCorrect,
       explanation: q.explanation || ''
     });
-  });
+  }
 
   const percentage = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
 
