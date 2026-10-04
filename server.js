@@ -162,6 +162,120 @@ app.get('/api/content', (req, res) => {
   });
 });
 
+// -------------------------------------------------------------
+// SMART TEXT MATCHING (Russian Porter Stemmer & Semantic Words)
+// -------------------------------------------------------------
+const STOP_WORDS = new Set(['в','на','и','с','по','после','что','как','все','всего','этого','этот','надо','нужно','бы','было','ли','же','то','о','об','для','от','к','до','а','но']);
+
+function stemRussian(word) {
+  word = word.toLowerCase().replace(/ё/g, 'е').trim();
+  if (word.length <= 3) return word;
+  const RVRE = /^(.*?[аеиоуыэюя])(.*)$/i;
+  const match = word.match(RVRE);
+  if (!match) return word;
+  let rv = match[2];
+  rv = rv.replace(/((ив|ивши|ившись|ыв|ывши|ывшись)|((?<=[ая])(в|вши|вшись)))$/, '');
+  rv = rv.replace(/(с[яь])$/, '');
+  rv = rv.replace(/(ее|ие|ые|ое|ими|ыми|ей|ий|ый|ой|ем|им|ым|ом|его|ого|ему|ому|их|ых|ую|юю|ая|яя|ою|ею)$/, '');
+  rv = rv.replace(/((ивш|ывш)|((?<=[ая])(ем|нн|вш|ющ|щ)))$/, '');
+  rv = rv.replace(/((ила|ыла|ена|ейте|уйте|ите|или|ыли|ей|уй|ил|ыл|им|ым|ен|ило|ыло|ено|ят|ует|уют|ит|ыт|ены|ить|ыть|ишь|ую|ю)|((?<=[ая])(ла|на|ете|йте|ли|й|л|ем|н|ло|но|ет|ют|ны|ть|ешь|нно)))$/, '');
+  rv = rv.replace(/(а|ев|ов|ие|ье|е|иями|ями|ами|еи|ии|и|ией|ей|ой|ий|й|иям|ям|ием|ем|ам|ом|о|у|ах|иях|ях|ы|ь|ию|ью|ю|яa|я)$/, '');
+  return match[1] + rv;
+}
+
+function extractKeyStems(text) {
+  return String(text || '').toLowerCase()
+    .replace(/[^а-яa-z0-9\s]/gi, ' ')
+    .split(/\s+/)
+    .map(w => w.trim())
+    .filter(w => w.length > 0 && !STOP_WORDS.has(w))
+    .map(stemRussian);
+}
+
+function isTextAnswerCorrect(userText, acceptableAnswers) {
+  if (!userText || !acceptableAnswers || !acceptableAnswers.length) return false;
+  const userClean = String(userText).toLowerCase().replace(/ё/g, 'е').trim();
+  const userStems = new Set(extractKeyStems(userClean));
+
+  for (const variant of acceptableAnswers) {
+    const varClean = String(variant).toLowerCase().replace(/ё/g, 'е').trim();
+    // 1. Exact match
+    if (userClean === varClean) return true;
+
+    // 2. Substring match
+    if (userClean.includes(varClean) || varClean.includes(userClean)) {
+      if (userClean.length >= 3 && varClean.length >= 3) return true;
+    }
+
+    // 3. Key stems matching
+    const varStems = extractKeyStems(varClean);
+    if (varStems.length > 0) {
+      const matchedCount = varStems.filter(stem => {
+        for (const u of userStems) {
+          if (u === stem || u.startsWith(stem) || stem.startsWith(u)) return true;
+        }
+        return false;
+      }).length;
+
+      const threshold = varStems.length <= 2 ? varStems.length : Math.ceil(varStems.length * 0.7);
+      if (matchedCount >= threshold) return true;
+    }
+  }
+  return false;
+}
+
+// Check single question on-the-fly (for immediate "Ответить" feedback)
+app.post('/api/quiz/check-question', (req, res) => {
+  const { quizId, questionId, answer } = req.body;
+  if (!quizId || !questionId) {
+    return res.status(400).json({ error: 'Некорректные параметры' });
+  }
+
+  const currentDb = getDb() || db;
+  const quiz = (currentDb.quizzes || []).find(q => q.id === quizId);
+  if (!quiz) return res.status(404).json({ error: 'Тест не найден' });
+
+  const q = (quiz.questions || []).find(item => item.id === questionId);
+  if (!q) return res.status(404).json({ error: 'Вопрос не найден' });
+
+  let isCorrect = false;
+
+  if (q.type === 'text') {
+    const userText = (Array.isArray(answer) ? (answer[0] || '') : (answer || '')).toString().trim();
+    let acceptable = [];
+    if (Array.isArray(q.acceptableAnswers)) acceptable = q.acceptableAnswers;
+    else if (Array.isArray(q.correctAnswers) && typeof q.correctAnswers[0] === 'string') acceptable = q.correctAnswers;
+    else if (Array.isArray(q.options) && q.options.length) acceptable = q.options;
+
+    isCorrect = isTextAnswerCorrect(userText, acceptable);
+
+    return res.json({
+      questionId: q.id,
+      type: 'text',
+      isCorrect,
+      userAnswerText: userText,
+      acceptableAnswers: acceptable,
+      explanation: q.explanation || ''
+    });
+  }
+
+  // Single or multiple choice
+  const userAnswers = (Array.isArray(answer) ? answer : [answer]).map(Number).sort();
+  const correctAnswers = (q.correctAnswers || []).map(Number).sort();
+
+  isCorrect = userAnswers.length === correctAnswers.length &&
+    userAnswers.every((val, idx) => val === correctAnswers[idx]);
+
+  res.json({
+    questionId: q.id,
+    type: q.type || 'single',
+    isCorrect,
+    userAnswers,
+    correctAnswers,
+    explanation: q.explanation || ''
+  });
+});
+
 // 2. Evaluate submitted quiz
 app.post('/api/quiz/evaluate', (req, res) => {
   const { quizId, answers } = req.body;
@@ -196,12 +310,7 @@ app.post('/api/quiz/evaluate', (req, res) => {
         acceptable = q.options;
       }
 
-      const acceptableNormalized = acceptable
-        .map(a => String(a).trim().toLowerCase())
-        .filter(Boolean);
-
-      const userNormalized = userText.toLowerCase();
-      isCorrect = acceptableNormalized.includes(userNormalized);
+      isCorrect = isTextAnswerCorrect(userText, acceptable);
 
       if (isCorrect) correctCount++;
 

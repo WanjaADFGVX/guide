@@ -159,12 +159,14 @@
         <div class="options-list" id="q-options-container">
           <!-- Options -->
         </div>
+        <div id="q-instant-feedback" style="display:none; margin-top:20px;"></div>
       </div>
 
       <div class="runner-nav-actions">
         <button id="btn-prev-q" class="btn-outline" onclick="QuizModule.prevQuestion()">← Назад</button>
-        <button id="btn-next-q" class="btn-primary" onclick="QuizModule.nextQuestion()">Следующий вопрос →</button>
-        <button id="btn-finish-quiz" class="btn-primary" style="display:none; background:var(--success);" onclick="QuizModule.submitQuiz()">Завершить и проверить ✓</button>
+        <button id="btn-check-q" class="btn-primary" onclick="QuizModule.checkCurrentQuestion()">Ответить</button>
+        <button id="btn-next-q" class="btn-primary" style="display:none;" onclick="QuizModule.nextQuestion()">Следующий вопрос →</button>
+        <button id="btn-finish-quiz" class="btn-primary" style="display:none; background:var(--success);" onclick="QuizModule.submitQuiz()">Завершить тест ✓</button>
       </div>
     </section>
 

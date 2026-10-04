@@ -2,7 +2,8 @@
 const QuizModule = {
   currentQuiz: null,
   currentQuestionIndex: 0,
-  userAnswers: {}, // { [questionId]: [optionIndex, ...] }
+  userAnswers: {}, // { [questionId]: [optionIndex, ...] or "text" }
+  checkedQuestions: {}, // { [questionId]: { isCorrect, correctAnswers, explanation, acceptableAnswers, userAnswerText } }
   timerInterval: null,
   secondsLeft: 0,
 
@@ -17,6 +18,7 @@ const QuizModule = {
     this.currentQuiz = quiz;
     this.currentQuestionIndex = 0;
     this.userAnswers = {};
+    this.checkedQuestions = {};
 
     // Switch view
     AppRouter.showView('view-quiz-runner');
@@ -61,13 +63,20 @@ const QuizModule = {
       const pill = document.createElement('button');
       pill.className = `question-pill ${idx === this.currentQuestionIndex ? 'active' : ''}`;
       
-      const isAnswered = q.type === 'text'
-        ? (typeof this.userAnswers[q.id] === 'string' && this.userAnswers[q.id].trim().length > 0)
-        : (this.userAnswers[q.id] && this.userAnswers[q.id].length > 0);
+      const checkRes = this.checkedQuestions[q.id];
+      if (checkRes) {
+        pill.classList.add(checkRes.isCorrect ? 'correct-pill' : 'wrong-pill');
+        pill.title = checkRes.isCorrect ? 'Верно' : 'Неверно';
+      } else {
+        const isAnswered = q.type === 'text'
+          ? (typeof this.userAnswers[q.id] === 'string' && this.userAnswers[q.id].trim().length > 0)
+          : (this.userAnswers[q.id] && this.userAnswers[q.id].length > 0);
 
-      if (isAnswered) {
-        pill.classList.add('answered');
+        if (isAnswered) {
+          pill.classList.add('answered');
+        }
       }
+
       pill.textContent = idx + 1;
       pill.onclick = () => {
         this.currentQuestionIndex = idx;
@@ -79,13 +88,8 @@ const QuizModule = {
 
     // Update progress bar
     const total = this.currentQuiz.questions.length;
-    const answeredCount = this.currentQuiz.questions.filter(q => {
-      if (q.type === 'text') {
-        return typeof this.userAnswers[q.id] === 'string' && this.userAnswers[q.id].trim().length > 0;
-      }
-      return this.userAnswers[q.id]?.length > 0;
-    }).length;
-    const percent = total > 0 ? (answeredCount / total) * 100 : 0;
+    const checkedCount = Object.keys(this.checkedQuestions).length;
+    const percent = total > 0 ? (checkedCount / total) * 100 : 0;
     document.getElementById('runner-progress-fill').style.width = `${percent}%`;
   },
 
@@ -104,6 +108,10 @@ const QuizModule = {
     const optionsContainer = document.getElementById('q-options-container');
     optionsContainer.innerHTML = '';
 
+    const feedbackEl = document.getElementById('q-instant-feedback');
+    const checkRes = this.checkedQuestions[q.id];
+    const isChecked = !!checkRes;
+
     if (q.type === 'text') {
       const currentVal = this.userAnswers[q.id] || '';
       const textWrapper = document.createElement('div');
@@ -111,63 +119,202 @@ const QuizModule = {
       textWrapper.style.flexDirection = 'column';
       textWrapper.style.gap = '12px';
 
+      let inputBorder = '';
+      if (isChecked) {
+        inputBorder = checkRes.isCorrect
+          ? 'border: 2px solid var(--success) !important; background: var(--success-bg);'
+          : 'border: 2px solid var(--danger) !important; background: var(--danger-bg);';
+      }
+
       textWrapper.innerHTML = `
         <label style="font-size:0.92rem; font-weight:600; color:var(--text-main);">Ваш ответ:</label>
-        <input type="text" id="q-text-input-${q.id}" class="form-input" style="font-size:1.05rem; padding:14px 18px; border-radius:var(--radius-md);" placeholder="Введите точный ответ (слово, число или команду)..." value="${currentVal.replace(/"/g, '&quot;')}">
-        <div style="font-size:0.8rem; color:var(--text-dim); display:flex; align-items:center; gap:6px;">
-          <span>💡 Регистр букв (заглавные/строчные) при проверке не учитывается.</span>
-        </div>
+        <input type="text" id="q-text-input-${q.id}" class="form-input" style="font-size:1.05rem; padding:14px 18px; border-radius:var(--radius-md); ${inputBorder}" placeholder="Введите ответ своими словами..." value="${currentVal.replace(/"/g, '&quot;')}" ${isChecked ? 'disabled' : ''}>
+        ${!isChecked ? '<div style="font-size:0.8rem; color:var(--text-dim);">💡 Регистр букв, падежи и порядок слов не влияют на оценку.</div>' : ''}
       `;
 
       const input = textWrapper.querySelector('input');
-      input.oninput = (e) => {
-        this.userAnswers[q.id] = e.target.value;
-        this.renderQuestionIndicators();
-      };
+      if (!isChecked) {
+        input.oninput = (e) => {
+          this.userAnswers[q.id] = e.target.value;
+          this.renderQuestionIndicators();
+          this.updateNavButtons();
+        };
+        setTimeout(() => input.focus(), 60);
+      }
 
       optionsContainer.appendChild(textWrapper);
-      setTimeout(() => input.focus(), 60);
     } else {
       const currentSelected = this.userAnswers[q.id] || [];
 
       q.options.forEach((optText, optIdx) => {
         const isSelected = currentSelected.includes(optIdx);
         const optItem = document.createElement('div');
-        optItem.className = `option-item ${q.type === 'multiple' ? 'multiple' : ''} ${isSelected ? 'selected' : ''}`;
+        optItem.className = `option-item ${q.type === 'multiple' ? 'multiple' : ''}`;
+
+        if (!isChecked) {
+          if (isSelected) optItem.classList.add('selected');
+          optItem.onclick = () => {
+            this.toggleOption(q.id, optIdx, q.type === 'multiple');
+          };
+        } else {
+          optItem.classList.add('disabled-clicks');
+          const isCorrectAnswer = (checkRes.correctAnswers || []).includes(optIdx);
+
+          if (isSelected && isCorrectAnswer) {
+            optItem.classList.add('is-correct-selected');
+          } else if (isSelected && !isCorrectAnswer) {
+            optItem.classList.add('is-wrong-selected');
+          } else if (!isSelected && isCorrectAnswer) {
+            optItem.classList.add('show-correct');
+          }
+        }
+
+        let indicatorContent = '';
+        if (isChecked) {
+          const isCorrectAnswer = (checkRes.correctAnswers || []).includes(optIdx);
+          if (isSelected && isCorrectAnswer) indicatorContent = '✓';
+          else if (isSelected && !isCorrectAnswer) indicatorContent = '✕';
+          else if (!isSelected && isCorrectAnswer) indicatorContent = '✓';
+        } else if (isSelected) {
+          indicatorContent = q.type === 'multiple' ? '✓' : '●';
+        }
 
         optItem.innerHTML = `
           <div class="option-indicator">
-            ${isSelected ? (q.type === 'multiple' ? '✓' : '●') : ''}
+            ${indicatorContent}
           </div>
           <div class="option-text">${optText}</div>
+          ${isChecked && (checkRes.correctAnswers || []).includes(optIdx) ? '<span style="font-size:0.78rem; font-weight:700; color:var(--success); margin-left:auto;">Правильный ответ</span>' : ''}
         `;
-
-        optItem.onclick = () => {
-          this.toggleOption(q.id, optIdx, q.type === 'multiple');
-        };
 
         optionsContainer.appendChild(optItem);
       });
     }
 
-    // Prev / Next button states
+    // Instant explanation & result display
+    if (isChecked) {
+      feedbackEl.style.display = 'block';
+      const badgeClass = checkRes.isCorrect ? 'correct' : 'wrong';
+      const badgeText = checkRes.isCorrect ? '✓ Верно!' : '✕ Неверно';
+      let correctHint = '';
+
+      if (q.type === 'text' && !checkRes.isCorrect) {
+        const acceptableList = (checkRes.acceptableAnswers || []).join(' или ');
+        correctHint = `<div style="margin-bottom:8px; font-size:0.92rem; color:var(--text-muted);"><strong>Правильный ответ:</strong> <span style="color:var(--success); font-weight:600;">${acceptableList || '-'}</span></div>`;
+      }
+
+      feedbackEl.innerHTML = `
+        <div class="instant-explanation-card ${checkRes.isCorrect ? 'correct-exp' : 'wrong-exp'}">
+          <div class="exp-badge ${badgeClass}">${badgeText}</div>
+          ${correctHint}
+          ${checkRes.explanation ? `<div class="exp-body"><strong>💡 Пояснение:</strong> ${checkRes.explanation}</div>` : ''}
+        </div>
+      `;
+    } else {
+      feedbackEl.style.display = 'none';
+      feedbackEl.innerHTML = '';
+    }
+
+    this.updateNavButtons();
+  },
+
+  updateNavButtons() {
+    const q = this.currentQuiz.questions[this.currentQuestionIndex];
+    if (!q) return;
+
     const prevBtn = document.getElementById('btn-prev-q');
+    const checkBtn = document.getElementById('btn-check-q');
     const nextBtn = document.getElementById('btn-next-q');
     const submitBtn = document.getElementById('btn-finish-quiz');
 
+    const isChecked = !!this.checkedQuestions[q.id];
+    const isLast = this.currentQuestionIndex === this.currentQuiz.questions.length - 1;
+
+    // Has user chosen an answer?
+    const hasAnswer = q.type === 'text'
+      ? (typeof this.userAnswers[q.id] === 'string' && this.userAnswers[q.id].trim().length > 0)
+      : (this.userAnswers[q.id] && this.userAnswers[q.id].length > 0);
+
+    // Prev button
     prevBtn.disabled = this.currentQuestionIndex === 0;
     prevBtn.style.opacity = this.currentQuestionIndex === 0 ? '0.4' : '1';
 
-    if (this.currentQuestionIndex === this.currentQuiz.questions.length - 1) {
+    if (!isChecked) {
+      // Must check first
+      checkBtn.style.display = 'inline-flex';
+      checkBtn.disabled = !hasAnswer;
+      checkBtn.style.opacity = hasAnswer ? '1' : '0.5';
+      checkBtn.textContent = 'Ответить';
+
       nextBtn.style.display = 'none';
-      submitBtn.style.display = 'inline-flex';
-    } else {
-      nextBtn.style.display = 'inline-flex';
       submitBtn.style.display = 'none';
+    } else {
+      // Already checked: show Next or Finish
+      checkBtn.style.display = 'none';
+
+      if (isLast) {
+        nextBtn.style.display = 'none';
+        submitBtn.style.display = 'inline-flex';
+        submitBtn.textContent = 'Завершить тест и посмотреть итоги ✓';
+      } else {
+        nextBtn.style.display = 'inline-flex';
+        submitBtn.style.display = 'none';
+      }
+    }
+  },
+
+  async checkCurrentQuestion() {
+    const q = this.currentQuiz.questions[this.currentQuestionIndex];
+    if (!q) return;
+
+    const ans = this.userAnswers[q.id];
+    if (q.type === 'text') {
+      if (!ans || typeof ans !== 'string' || !ans.trim()) {
+        Toast.show('Введите ответ в поле', 'warning');
+        return;
+      }
+    } else {
+      if (!ans || !ans.length) {
+        Toast.show('Выберите вариант ответа', 'warning');
+        return;
+      }
+    }
+
+    const checkBtn = document.getElementById('btn-check-q');
+    if (checkBtn) {
+      checkBtn.disabled = true;
+      checkBtn.textContent = 'Проверяем...';
+    }
+
+    try {
+      const res = await fetch('/api/quiz/check-question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quizId: this.currentQuiz.id,
+          questionId: q.id,
+          answer: ans
+        })
+      });
+
+      if (!res.ok) throw new Error('Ошибка проверки');
+      const data = await res.json();
+      this.checkedQuestions[q.id] = data;
+
+      this.renderQuestionIndicators();
+      this.renderCurrentQuestion();
+    } catch (err) {
+      Toast.show(err.message, 'error');
+      if (checkBtn) {
+        checkBtn.disabled = false;
+        checkBtn.textContent = 'Ответить';
+      }
     }
   },
 
   toggleOption(questionId, optIdx, isMultiple) {
+    if (this.checkedQuestions[questionId]) return;
+
     if (!this.userAnswers[questionId]) {
       this.userAnswers[questionId] = [];
     }
