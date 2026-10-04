@@ -1568,15 +1568,82 @@ body {
 }
 
 /* =====================================================================
-   RESPONSIVE (Mobile & Tablet)
+   MOBILE & DRAWER UI ELEMENTS (Base states)
+   ===================================================================== */
+.sidebar-close-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.2rem;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.sidebar-close-btn:hover {
+  color: var(--text-main);
+  background: var(--bg-hover);
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 85;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-normal);
+}
+
+.sidebar-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mobile-toc-fab {
+  display: none;
+  position: fixed;
+  bottom: 74px;
+  right: 18px;
+  z-index: 80;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  align-items: center;
+  gap: 8px;
+  transition: all var(--transition-fast);
+}
+
+.mobile-toc-fab:active {
+  transform: scale(0.95);
+}
+
+.mobile-bottom-nav {
+  display: none;
+}
+
+/* =====================================================================
+   RESPONSIVE: TABLETS & MOBILE (< 960px)
    ===================================================================== */
 @media (max-width: 960px) {
   .manual-sidebar {
     position: fixed;
     top: 64px;
+    bottom: 0;
     left: -320px;
+    height: calc(100vh - 64px);
     z-index: 90;
-    transition: left var(--transition-normal);
+    transition: transform var(--transition-normal), left var(--transition-normal);
     box-shadow: var(--shadow-lg);
   }
 
@@ -1584,12 +1651,17 @@ body {
     left: 0;
   }
 
+  .sidebar-close-btn {
+    display: inline-block;
+  }
+
   .mobile-menu-btn {
     display: flex;
   }
 
   .manual-content-wrapper {
-    padding: 24px 16px;
+    padding: 24px 20px 40px;
+    max-width: 100%;
   }
 
   .split-editor-grid {
@@ -1599,4 +1671,335 @@ body {
   .search-trigger-btn span, .kbd-shortcut {
     display: none;
   }
+
+  .mobile-toc-fab {
+    display: flex;
+  }
 }
+
+/* =====================================================================
+   RESPONSIVE: SMARTPHONES (< 680px)
+   ===================================================================== */
+@media (max-width: 680px) {
+  body {
+    padding-bottom: 64px; /* Clearance for mobile bottom navigation */
+  }
+
+  /* Top Header compact */
+  .site-header {
+    height: 58px;
+  }
+
+  .header-container {
+    padding: 0 12px;
+  }
+
+  .logo-title {
+    font-size: 0.95rem;
+  }
+
+  .logo-subtitle {
+    display: none; /* Hide subtitle to keep header super clean on narrow screens */
+  }
+
+  .nav-links {
+    display: none; /* Moved to bottom navigation bar on smartphones */
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .search-trigger-btn {
+    padding: 7px 10px;
+  }
+
+  /* Fixed Bottom Navigation Bar */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--header-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--border);
+    z-index: 99;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 4px;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    flex: 1;
+    height: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+  }
+
+  .mobile-nav-item.active {
+    color: var(--primary);
+    font-weight: 700;
+  }
+
+  .mobile-nav-item svg {
+    stroke-width: 2.2;
+  }
+
+  /* Article Content */
+  .manual-content-wrapper {
+    padding: 16px 14px 40px;
+  }
+
+  .article-breadcrumbs {
+    font-size: 0.78rem;
+    margin-bottom: 12px;
+  }
+
+  .article-meta-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+  }
+
+  .mark-completed-btn {
+    width: 100%;
+    justify-content: center;
+    margin-left: 0;
+    padding: 8px 12px;
+  }
+
+  .article-rendered-body {
+    font-size: 0.98rem;
+    line-height: 1.65;
+  }
+
+  .article-rendered-body h1,
+  .article-rendered-body .md-h1 {
+    font-size: 1.6rem;
+    line-height: 1.3;
+    margin-bottom: 14px;
+  }
+
+  .article-rendered-body h2,
+  .article-rendered-body .md-h2 {
+    font-size: 1.25rem;
+    margin-top: 26px;
+    margin-bottom: 10px;
+  }
+
+  .article-rendered-body h3,
+  .article-rendered-body .md-h3 {
+    font-size: 1.1rem;
+    margin-top: 20px;
+    margin-bottom: 8px;
+  }
+
+  .code-block-wrapper {
+    margin: 16px -4px;
+    border-radius: var(--radius-sm);
+  }
+
+  .md-pre {
+    padding: 12px;
+    font-size: 0.82rem;
+  }
+
+  .quiz-cta-card {
+    flex-direction: column;
+    text-align: center;
+    gap: 14px;
+    padding: 18px 14px;
+  }
+
+  .quiz-cta-card .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .chapter-nav-buttons {
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .chapter-nav-buttons .btn-outline {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* Quizzes Hub View */
+  #view-quizzes {
+    padding: 24px 14px 40px;
+  }
+
+  .page-main-title {
+    font-size: 1.5rem;
+  }
+
+  .page-main-desc {
+    font-size: 0.92rem;
+  }
+
+  .quizzes-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .quiz-card {
+    padding: 18px 16px;
+  }
+
+  /* Quiz Runner View */
+  #view-quiz-runner {
+    padding: 20px 12px 40px;
+  }
+
+  .runner-header {
+    margin-bottom: 16px;
+  }
+
+  .runner-indicators {
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .question-pill {
+    width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
+  }
+
+  .question-box {
+    padding: 20px 14px;
+    margin-bottom: 20px;
+    border-radius: var(--radius-md);
+  }
+
+  .question-prompt {
+    font-size: 1.15rem;
+    line-height: 1.38;
+    margin-bottom: 18px;
+  }
+
+  .option-item {
+    padding: 12px 14px;
+  }
+
+  .option-text {
+    font-size: 0.92rem;
+  }
+
+  .runner-nav-actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .runner-nav-actions button {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 16px;
+  }
+
+  /* Quiz Results View */
+  #view-quiz-results {
+    padding: 20px 14px 40px;
+  }
+
+  .results-summary-card {
+    padding: 24px 16px;
+  }
+
+  .results-title {
+    font-size: 1.35rem;
+  }
+
+  .results-subtitle {
+    font-size: 0.9rem;
+  }
+
+  .results-actions {
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .results-actions button,
+  .results-actions a {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* Admin View on mobile */
+  #view-admin {
+    padding: 20px 12px 40px;
+  }
+
+  .admin-login-box {
+    margin: 30px auto;
+    padding: 24px 16px;
+  }
+
+  .admin-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .admin-header-row button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-nav-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    gap: 4px;
+    padding-bottom: 8px;
+    margin-bottom: 20px;
+  }
+
+  .admin-tab-btn {
+    font-size: 0.85rem;
+    padding: 7px 12px;
+    flex-shrink: 0;
+  }
+
+  /* Modals on mobile: full screen touch experience */
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal-card {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    max-height: 94vh;
+    padding: 20px 16px;
+  }
+
+  .search-modal-box {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+}
+

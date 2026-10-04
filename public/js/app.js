@@ -89,6 +89,11 @@ const AppState = {
         link.className = `article-nav-link ${isDone ? 'completed' : ''}`;
         link.href = `#manual/${sec.id}/${art.id}`;
         link.id = `nav-art-${art.id}`;
+        link.onclick = () => {
+          if (window.innerWidth <= 960) {
+            toggleMobileSidebar(false);
+          }
+        };
         link.innerHTML = `
           <span>${art.title}</span>
           <div class="article-read-check">
@@ -257,10 +262,20 @@ const AppRouter = {
     const parts = hash.split('/');
     const route = parts[0];
 
-    // Nav active link highlight
-    document.querySelectorAll('.nav-btn').forEach(btn => {
+    // Nav active link highlight for desktop and mobile bottom bar
+    document.querySelectorAll('.nav-btn, .mobile-nav-item').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.route === route);
     });
+
+    // Toggle mobile TOC FAB visibility
+    const tocFab = document.getElementById('mobile-toc-fab');
+    if (tocFab) {
+      tocFab.style.display = route === 'manual' ? 'flex' : 'none';
+    }
+
+    if (window.innerWidth <= 960) {
+      toggleMobileSidebar(false);
+    }
 
     if (route === 'manual') {
       this.showView('view-manual');
@@ -437,9 +452,16 @@ function toggleTheme() {
   setTheme(current === 'dark' ? 'light' : 'dark');
 }
 
-function toggleMobileSidebar() {
+function toggleMobileSidebar(force) {
   const sidebar = document.querySelector('.manual-sidebar');
-  if (sidebar) sidebar.classList.toggle('open');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (!sidebar) return;
+  const isOpen = force !== undefined ? force : !sidebar.classList.contains('open');
+  sidebar.classList.toggle('open', isOpen);
+  if (backdrop) {
+    backdrop.classList.toggle('active', isOpen);
+  }
+  document.body.style.overflow = (isOpen && window.innerWidth <= 960) ? 'hidden' : '';
 }
 
 // Bootstrap
