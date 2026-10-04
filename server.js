@@ -105,6 +105,7 @@ function verifyAdmin(req, res, next) {
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 15,
+  validate: { xForwardedForHeader: false },
   message: { error: 'Слишком много попыток входа. Попробуйте через 15 минут.' }
 });
 
