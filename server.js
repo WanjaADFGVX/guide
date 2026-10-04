@@ -222,10 +222,40 @@ function extractKeyStems(text) {
     .map(stemRussian);
 }
 
+const SEMANTIC_CLUSTERS = [
+  // Действие фиксации, записи, ознакомления, съемки
+  { id: 'action_record', stems: ['запис', 'фикс', 'перепис', 'узна', 'запомн', 'посмотр', 'провер', 'списа', 'взглян', 'прочит', 'фото', 'сфотк', 'снимок', 'сфотографир', 'видео', 'съемк', 'камер', 'засня'] },
+  // Данные, реквизиты, личность, документы
+  { id: 'data_identity', stems: ['данн', 'фио', 'фамил', 'сведен', 'информац', 'имен', 'номер', 'жетон', 'удостоверен', 'документ', 'знак'] },
+  // Сотрудник полиции, инспектор
+  { id: 'person_officer', stems: ['сотрудник', 'полиц', 'полицейск', 'инспектор', 'патрульн', 'дпс', 'ппс', 'офицер', 'страж', 'гаишник'] },
+  // Отказ / запрет
+  { id: 'action_refuse', stems: ['отказ', 'не соглас', 'запрет', 'не дава', 'не показ'] },
+  // Передача документов
+  { id: 'action_give_doc', stems: ['отда', 'переда', 'в рук', 'показа', 'предъяв'] }
+];
+
+function getClustersForStems(stems) {
+  const clusters = new Set();
+  for (const stem of stems) {
+    for (const c of SEMANTIC_CLUSTERS) {
+      for (const s of c.stems) {
+        if (stem.startsWith(s) || s.startsWith(stem)) {
+          clusters.add(c.id);
+          break;
+        }
+      }
+    }
+  }
+  return clusters;
+}
+
 function isTextAnswerCorrect(userText, acceptableAnswers) {
   if (!userText || !acceptableAnswers || !acceptableAnswers.length) return false;
   const userClean = String(userText).toLowerCase().replace(/ё/g, 'е').trim();
-  const userStems = new Set(extractKeyStems(userClean));
+  const userStemsList = extractKeyStems(userClean);
+  const userStems = new Set(userStemsList);
+  const userClusters = getClustersForStems(userStemsList);
 
   for (const variant of acceptableAnswers) {
     const varClean = String(variant).toLowerCase().replace(/ё/g, 'е').trim();
@@ -249,6 +279,17 @@ function isTextAnswerCorrect(userText, acceptableAnswers) {
 
       const threshold = varStems.length <= 2 ? varStems.length : Math.ceil(varStems.length * 0.7);
       if (matchedCount >= threshold) return true;
+
+      // 4. Semantic cluster matching (e.g. узнать фио полицейского == записать данные сотрудника)
+      const varClusters = getClustersForStems(varStems);
+      if (varClusters.size > 0 && userClusters.size > 0) {
+        let matchedClusters = 0;
+        for (const cId of varClusters) {
+          if (userClusters.has(cId)) matchedClusters++;
+        }
+        const clusterThreshold = varClusters.size <= 2 ? varClusters.size : Math.ceil(varClusters.size * 0.7);
+        if (matchedClusters >= clusterThreshold) return true;
+      }
     }
   }
   return false;
@@ -258,7 +299,7 @@ function isTextAnswerCorrect(userText, acceptableAnswers) {
 // SEMANTIC EMBEDDINGS (ML FALLBACK)
 // -------------------------------------------------------------
 const ENABLE_SEMANTIC_FALLBACK = process.env.ENABLE_SEMANTIC_FALLBACK !== 'false';
-const SEMANTIC_SIMILARITY_THRESHOLD = parseFloat(process.env.SEMANTIC_SIMILARITY_THRESHOLD) || 0.72;
+const SEMANTIC_SIMILARITY_THRESHOLD = parseFloat(process.env.SEMANTIC_SIMILARITY_THRESHOLD) || 0.60;
 
 let featureExtractor = null;
 let mlLoadingPromise = null;
