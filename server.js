@@ -17,7 +17,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // In-memory content cache for sub-millisecond read performance
 let db = null;
-const adminSessions = new Map(); // token -> { createdAt, expiresAt }
+
+// Stable session secret across restarts and PM2 cluster workers
+const SESSION_SECRET = process.env.SESSION_SECRET ||
+  crypto.createHash('sha256').update(process.env.ADMIN_PASSWORD || 'study-portal-secret-salt-2026').digest('hex');
 
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password).digest('hex');
@@ -72,14 +75,45 @@ function saveData() {
   }
   // Atomically rename
   fs.renameSync(tmpFile, DATA_FILE);
+  try {
+    lastMtime = fs.statSync(DATA_FILE).mtimeMs;
+  } catch (e) {}
 }
 
 // Initialize data
 loadData();
 
-// Auth helper
-function generateToken() {
-  return crypto.randomBytes(32).toString('hex');
+// -------------------------------------------------------------
+// STATELESS HMAC-SHA256 ADMIN AUTH (Survives Restarts & PM2 Clusters)
+// -------------------------------------------------------------
+
+function generateAdminToken() {
+  const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
+  const salt = crypto.randomBytes(16).toString('hex');
+  const payload = `${expiresAt}:${salt}`;
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  return Buffer.from(`${payload}:${sig}`).toString('base64url');
+}
+
+function verifyAdminToken(token) {
+  if (!token) return false;
+  try {
+    const decoded = Buffer.from(token, 'base64url').toString('utf8');
+    const parts = decoded.split(':');
+    if (parts.length !== 3) return false;
+    const [expiresAtStr, salt, sig] = parts;
+    const expiresAt = Number(expiresAtStr);
+    if (!expiresAt || expiresAt < Date.now()) return false;
+
+    const payload = `${expiresAtStr}:${salt}`;
+    const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+    const sigBuf = Buffer.from(sig);
+    const expBuf = Buffer.from(expectedSig);
+    if (sigBuf.length !== expBuf.length) return false;
+    return crypto.timingSafeEqual(sigBuf, expBuf);
+  } catch (err) {
+    return false;
+  }
 }
 
 function verifyAdmin(req, res, next) {
@@ -89,15 +123,10 @@ function verifyAdmin(req, res, next) {
   }
 
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-  const session = adminSessions.get(token);
-
-  if (!session || Date.now() > session.expiresAt) {
-    if (session) adminSessions.delete(token);
+  if (!verifyAdminToken(token)) {
     return res.status(401).json({ error: 'Сессия истекла или недействительна' });
   }
 
-  // Extend session by 2 hours
-  session.expiresAt = Date.now() + 2 * 60 * 60 * 1000;
   next();
 }
 
@@ -492,11 +521,7 @@ app.post('/api/admin/login', loginLimiter, (req, res) => {
   const currentHash = db.settings?.adminPasswordHash;
 
   if (inputHash === currentHash || (process.env.ADMIN_PASSWORD && password === process.env.ADMIN_PASSWORD)) {
-    const token = generateToken();
-    adminSessions.set(token, {
-      createdAt: Date.now(),
-      expiresAt: Date.now() + 2 * 60 * 60 * 1000 // 2 hours
-    });
+    const token = generateAdminToken();
 
     return res.json({
       success: true,
@@ -508,12 +533,7 @@ app.post('/api/admin/login', loginLimiter, (req, res) => {
   return res.status(401).json({ error: 'Неверный пароль администратора' });
 });
 
-app.post('/api/admin/logout', verifyAdmin, (req, res) => {
-  const authHeader = req.headers['authorization'];
-  if (authHeader) {
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-    adminSessions.delete(token);
-  }
+app.post('/api/admin/logout', (req, res) => {
   res.json({ success: true });
 });
 
@@ -527,7 +547,8 @@ app.get('/api/admin/check', verifyAdmin, (req, res) => {
 
 // Full data access for admin (including correct answers)
 app.get('/api/admin/data', verifyAdmin, (req, res) => {
-  const adminCopy = JSON.parse(JSON.stringify(db));
+  const currentDb = getDb() || db;
+  const adminCopy = JSON.parse(JSON.stringify(currentDb));
   // Don't leak the password hash in plain responses
   if (adminCopy.settings) {
     delete adminCopy.settings.adminPasswordHash;
@@ -539,16 +560,18 @@ app.get('/api/admin/data', verifyAdmin, (req, res) => {
 app.post('/api/admin/data', verifyAdmin, (req, res) => {
   const { settings, sections, quizzes } = req.body;
 
-  if (!Array.isArray(sections) || !Array.isArray(quizzes)) {
-    return res.status(400).json({ error: 'Некорректная структура данных' });
+  if (!Array.isArray(quizzes)) {
+    return res.status(400).json({ error: 'Некорректная структура: отсутствует список тестов' });
   }
 
   // Preserve existing password hash unless explicitly changed via password API
   const preservedHash = db.settings?.adminPasswordHash;
 
-  db.sections = sections;
+  if (Array.isArray(sections)) {
+    db.sections = sections;
+  }
   db.quizzes = quizzes;
-  if (settings) {
+  if (settings && typeof settings === 'object') {
     db.settings = {
       ...db.settings,
       ...settings,

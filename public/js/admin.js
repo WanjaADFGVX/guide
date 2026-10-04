@@ -369,8 +369,58 @@ const AdminModule = {
     this.editingQuiz = null;
   },
 
+  syncCurrentQuizDOM() {
+    if (!this.editingQuiz) return;
+    const titleEl = document.getElementById('edit-quiz-title');
+    const descEl = document.getElementById('edit-quiz-desc');
+    const timeEl = document.getElementById('edit-quiz-time');
+    if (titleEl) this.editingQuiz.title = titleEl.value.trim();
+    if (descEl) this.editingQuiz.description = descEl.value.trim();
+    if (timeEl) this.editingQuiz.timeLimit = parseInt(timeEl.value) || 0;
+
+    const list = document.getElementById('edit-quiz-questions-list');
+    if (!list) return;
+
+    const cardEls = list.querySelectorAll('.question-edit-card');
+    cardEls.forEach((card, qIdx) => {
+      if (!this.editingQuiz.questions[qIdx]) return;
+      const q = this.editingQuiz.questions[qIdx];
+
+      const qTextInp = card.querySelector('.q-text-input');
+      if (qTextInp) q.question = qTextInp.value.trim();
+
+      const qTypeSelect = card.querySelector('.q-type-select');
+      if (qTypeSelect) q.type = qTypeSelect.value;
+
+      const explTextarea = card.querySelector('.q-expl-textarea');
+      if (explTextarea) q.explanation = explTextarea.value.trim();
+
+      if (q.type === 'text') {
+        const textInps = card.querySelectorAll('.q-text-answer-input');
+        const acc = [];
+        textInps.forEach(inp => {
+          const val = inp.value.trim();
+          if (val) acc.push(val);
+        });
+        q.acceptableAnswers = acc.length ? acc : [''];
+      } else {
+        const optRows = card.querySelectorAll('.option-edit-row');
+        const options = [];
+        const correct = [];
+        optRows.forEach((row, optIdx) => {
+          const optTextInp = row.querySelector('.q-option-text-input');
+          const optChk = row.querySelector('.q-option-checkbox');
+          if (optTextInp) options.push(optTextInp.value);
+          if (optChk && optChk.checked) correct.push(optIdx);
+        });
+        q.options = options.length ? options : ['Вариант 1', 'Вариант 2'];
+        q.correctAnswers = correct;
+      }
+    });
+  },
+
   renderQuizEditorModal() {
-    document.getElementById('edit-quiz-title').value = this.editingQuiz.title;
+    document.getElementById('edit-quiz-title').value = this.editingQuiz.title || '';
     document.getElementById('edit-quiz-desc').value = this.editingQuiz.description || '';
     document.getElementById('edit-quiz-time').value = this.editingQuiz.timeLimit || 0;
 
@@ -388,7 +438,7 @@ const AdminModule = {
         const acceptableInputs = acceptable.map((ans, aIdx) => `
           <div class="option-edit-row">
             <span style="font-size:0.9rem; color:var(--success); font-weight:700;">✓</span>
-            <input type="text" class="form-input" style="flex:1;" value="${(ans || '').replace(/"/g, '&quot;')}" oninput="AdminModule.updateAcceptableAnswer(${qIdx}, ${aIdx}, this.value)" placeholder="Правильный ответ (например: 443 или pwd)">
+            <input type="text" class="form-input q-text-answer-input" style="flex:1;" value="${(ans || '').replace(/"/g, '&quot;')}" oninput="AdminModule.updateAcceptableAnswer(${qIdx}, ${aIdx}, this.value)" placeholder="Правильный ответ (например: 443 или pwd)">
             <button class="btn-icon-danger" onclick="AdminModule.removeAcceptableAnswer(${qIdx}, ${aIdx})" title="Удалить вариант">✕</button>
           </div>
         `).join('');
@@ -408,8 +458,8 @@ const AdminModule = {
           const isChecked = (q.correctAnswers || []).includes(optIdx);
           return `
             <div class="option-edit-row">
-              <input type="checkbox" class="option-edit-checkbox" ${isChecked ? 'checked' : ''} onchange="AdminModule.toggleCorrectAnswer(${qIdx}, ${optIdx}, this.checked)">
-              <input type="text" class="form-input" style="flex:1;" value="${(opt || '').replace(/"/g, '&quot;')}" oninput="AdminModule.updateOptionText(${qIdx}, ${optIdx}, this.value)" placeholder="Вариант ответа">
+              <input type="checkbox" class="option-edit-checkbox q-option-checkbox" ${isChecked ? 'checked' : ''} onchange="AdminModule.toggleCorrectAnswer(${qIdx}, ${optIdx}, this.checked)">
+              <input type="text" class="form-input q-option-text-input" style="flex:1;" value="${(opt || '').replace(/"/g, '&quot;')}" oninput="AdminModule.updateOptionText(${qIdx}, ${optIdx}, this.value)" placeholder="Вариант ответа">
               <button class="btn-icon-danger" onclick="AdminModule.removeOption(${qIdx}, ${optIdx})" title="Удалить вариант">✕</button>
             </div>
           `;
@@ -431,11 +481,11 @@ const AdminModule = {
         </div>
         <div class="form-group">
           <label class="form-label">Текст вопроса:</label>
-          <input type="text" class="form-input" value="${(q.question || '').replace(/"/g, '&quot;')}" oninput="AdminModule.updateQuestionText(${qIdx}, this.value)" placeholder="Введите текст вопроса...">
+          <input type="text" class="form-input q-text-input" value="${(q.question || '').replace(/"/g, '&quot;')}" oninput="AdminModule.updateQuestionText(${qIdx}, this.value)" placeholder="Введите текст вопроса...">
         </div>
         <div class="form-group">
           <label class="form-label">Тип вопроса:</label>
-          <select class="form-select" onchange="AdminModule.updateQuestionType(${qIdx}, this.value)">
+          <select class="form-select q-type-select" onchange="AdminModule.updateQuestionType(${qIdx}, this.value)">
             <option value="single" ${q.type === 'single' ? 'selected' : ''}>Одиночный выбор (один верный ответ из предложенных)</option>
             <option value="multiple" ${q.type === 'multiple' ? 'selected' : ''}>Множественный выбор (несколько верных ответов из предложенных)</option>
             <option value="text" ${q.type === 'text' ? 'selected' : ''}>✍️ Ввод текста (пользователь вписывает ответ сам)</option>
@@ -444,7 +494,7 @@ const AdminModule = {
         ${optionsBlock}
         <div class="form-group">
           <label class="form-label">Пояснение (будет показано после ответа):</label>
-          <textarea class="form-textarea" style="min-height:60px;" oninput="AdminModule.updateQuestionExplanation(${qIdx}, this.value)" placeholder="Почему этот ответ верный...">${q.explanation || ''}</textarea>
+          <textarea class="form-textarea q-expl-textarea" style="min-height:60px;" oninput="AdminModule.updateQuestionExplanation(${qIdx}, this.value)" placeholder="Почему этот ответ верный...">${q.explanation || ''}</textarea>
         </div>
       `;
 
@@ -453,6 +503,7 @@ const AdminModule = {
   },
 
   addQuestionToQuiz() {
+    this.syncCurrentQuizDOM();
     this.editingQuiz.questions.push({
       id: 'q-' + Date.now(),
       question: '',
@@ -465,16 +516,21 @@ const AdminModule = {
   },
 
   removeQuestion(qIdx) {
+    this.syncCurrentQuizDOM();
     this.editingQuiz.questions.splice(qIdx, 1);
     this.renderQuizEditorModal();
   },
 
   updateQuestionText(qIdx, text) {
-    this.editingQuiz.questions[qIdx].question = text;
+    if (this.editingQuiz.questions[qIdx]) {
+      this.editingQuiz.questions[qIdx].question = text;
+    }
   },
 
   updateQuestionType(qIdx, type) {
+    this.syncCurrentQuizDOM();
     const q = this.editingQuiz.questions[qIdx];
+    if (!q) return;
     q.type = type;
     if (type === 'text') {
       if (!Array.isArray(q.acceptableAnswers) || q.acceptableAnswers.length === 0) {
@@ -490,56 +546,79 @@ const AdminModule = {
   },
 
   updateAcceptableAnswer(qIdx, aIdx, val) {
-    if (!this.editingQuiz.questions[qIdx].acceptableAnswers) {
-      this.editingQuiz.questions[qIdx].acceptableAnswers = [];
+    if (this.editingQuiz.questions[qIdx]) {
+      if (!this.editingQuiz.questions[qIdx].acceptableAnswers) {
+        this.editingQuiz.questions[qIdx].acceptableAnswers = [];
+      }
+      this.editingQuiz.questions[qIdx].acceptableAnswers[aIdx] = val;
     }
-    this.editingQuiz.questions[qIdx].acceptableAnswers[aIdx] = val;
   },
 
   addAcceptableAnswer(qIdx) {
-    if (!this.editingQuiz.questions[qIdx].acceptableAnswers) {
-      this.editingQuiz.questions[qIdx].acceptableAnswers = [];
+    this.syncCurrentQuizDOM();
+    if (this.editingQuiz.questions[qIdx]) {
+      if (!this.editingQuiz.questions[qIdx].acceptableAnswers) {
+        this.editingQuiz.questions[qIdx].acceptableAnswers = [];
+      }
+      this.editingQuiz.questions[qIdx].acceptableAnswers.push('');
+      this.renderQuizEditorModal();
     }
-    this.editingQuiz.questions[qIdx].acceptableAnswers.push('');
-    this.renderQuizEditorModal();
   },
 
   removeAcceptableAnswer(qIdx, aIdx) {
-    if (!this.editingQuiz.questions[qIdx].acceptableAnswers) return;
-    this.editingQuiz.questions[qIdx].acceptableAnswers.splice(aIdx, 1);
-    if (this.editingQuiz.questions[qIdx].acceptableAnswers.length === 0) {
-      this.editingQuiz.questions[qIdx].acceptableAnswers.push('');
+    this.syncCurrentQuizDOM();
+    if (this.editingQuiz.questions[qIdx] && this.editingQuiz.questions[qIdx].acceptableAnswers) {
+      this.editingQuiz.questions[qIdx].acceptableAnswers.splice(aIdx, 1);
+      if (this.editingQuiz.questions[qIdx].acceptableAnswers.length === 0) {
+        this.editingQuiz.questions[qIdx].acceptableAnswers.push('');
+      }
+      this.renderQuizEditorModal();
     }
-    this.renderQuizEditorModal();
   },
 
   updateQuestionExplanation(qIdx, text) {
-    this.editingQuiz.questions[qIdx].explanation = text;
+    if (this.editingQuiz.questions[qIdx]) {
+      this.editingQuiz.questions[qIdx].explanation = text;
+    }
   },
 
   addOption(qIdx) {
-    this.editingQuiz.questions[qIdx].options.push('Новый вариант');
-    this.renderQuizEditorModal();
+    this.syncCurrentQuizDOM();
+    if (this.editingQuiz.questions[qIdx]) {
+      if (!Array.isArray(this.editingQuiz.questions[qIdx].options)) {
+        this.editingQuiz.questions[qIdx].options = [];
+      }
+      this.editingQuiz.questions[qIdx].options.push('Новый вариант');
+      this.renderQuizEditorModal();
+    }
   },
 
   removeOption(qIdx, optIdx) {
-    this.editingQuiz.questions[qIdx].options.splice(optIdx, 1);
-    this.editingQuiz.questions[qIdx].correctAnswers = this.editingQuiz.questions[qIdx].correctAnswers
-      .filter(i => i !== optIdx)
-      .map(i => i > optIdx ? i - 1 : i);
-    this.renderQuizEditorModal();
+    this.syncCurrentQuizDOM();
+    if (this.editingQuiz.questions[qIdx] && Array.isArray(this.editingQuiz.questions[qIdx].options)) {
+      this.editingQuiz.questions[qIdx].options.splice(optIdx, 1);
+      this.editingQuiz.questions[qIdx].correctAnswers = (this.editingQuiz.questions[qIdx].correctAnswers || [])
+        .filter(i => i !== optIdx)
+        .map(i => i > optIdx ? i - 1 : i);
+      this.renderQuizEditorModal();
+    }
   },
 
   updateOptionText(qIdx, optIdx, val) {
-    this.editingQuiz.questions[qIdx].options[optIdx] = val;
+    if (this.editingQuiz.questions[qIdx] && this.editingQuiz.questions[qIdx].options) {
+      this.editingQuiz.questions[qIdx].options[optIdx] = val;
+    }
   },
 
   toggleCorrectAnswer(qIdx, optIdx, isChecked) {
+    this.syncCurrentQuizDOM();
     const q = this.editingQuiz.questions[qIdx];
+    if (!q) return;
     if (q.type === 'single') {
       q.correctAnswers = isChecked ? [optIdx] : [];
       this.renderQuizEditorModal();
     } else {
+      if (!Array.isArray(q.correctAnswers)) q.correctAnswers = [];
       if (isChecked && !q.correctAnswers.includes(optIdx)) {
         q.correctAnswers.push(optIdx);
       } else if (!isChecked) {
@@ -549,16 +628,17 @@ const AdminModule = {
   },
 
   saveQuiz() {
-    const title = document.getElementById('edit-quiz-title').value.trim();
-    const desc = document.getElementById('edit-quiz-desc').value.trim();
-    const timeLimit = parseInt(document.getElementById('edit-quiz-time').value) || 0;
+    this.syncCurrentQuizDOM();
+    const title = (this.editingQuiz.title || '').trim();
+    const desc = (this.editingQuiz.description || '').trim();
+    const timeLimit = parseInt(this.editingQuiz.timeLimit) || 0;
 
     if (!title) {
       Toast.show('Укажите название теста', 'error');
       return;
     }
 
-    // Clean up text questions
+    // Clean up questions
     (this.editingQuiz.questions || []).forEach(q => {
       if (q.type === 'text') {
         q.acceptableAnswers = (q.acceptableAnswers || [])
@@ -567,12 +647,25 @@ const AdminModule = {
         if (q.acceptableAnswers.length === 0) {
           q.acceptableAnswers = [''];
         }
+      } else {
+        if (!Array.isArray(q.options) || q.options.length === 0) {
+          q.options = ['Вариант 1', 'Вариант 2'];
+        }
+        if (!Array.isArray(q.correctAnswers) || q.correctAnswers.length === 0) {
+          q.correctAnswers = [0];
+        } else if (q.type === 'single' && q.correctAnswers.length > 1) {
+          q.correctAnswers = [q.correctAnswers[0]];
+        }
       }
     });
 
     this.editingQuiz.title = title;
     this.editingQuiz.description = desc;
     this.editingQuiz.timeLimit = timeLimit;
+
+    if (!Array.isArray(this.adminData.quizzes)) {
+      this.adminData.quizzes = [];
+    }
 
     const idx = this.adminData.quizzes.findIndex(q => q.id === this.editingQuiz.id);
     if (idx !== -1) {
@@ -670,6 +763,12 @@ const AdminModule = {
   // SAVE DATA TO SERVER
   // -------------------------------------------------------------
   async saveDataToServer(successMessage = 'Изменения сохранены') {
+    if (!this.token) {
+      Toast.show('Вы не авторизованы. Пожалуйста, войдите в панель управления.', 'error');
+      this.showLogin();
+      return;
+    }
+
     try {
       const res = await fetch('/api/admin/data', {
         method: 'POST',
@@ -681,12 +780,21 @@ const AdminModule = {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Ошибка сохранения');
+      if (!res.ok) {
+        if (res.status === 401) {
+          Toast.show('Сессия авторизации истекла. Пожалуйста, войдите снова.', 'error');
+          this.logout();
+          return;
+        }
+        throw new Error(data.error || 'Ошибка сохранения данных');
+      }
 
       Toast.show(successMessage, 'success');
       this.renderCurrentTab();
       // Update public view immediately
-      AppState.loadContent();
+      if (typeof AppState !== 'undefined' && AppState.loadContent) {
+        AppState.loadContent();
+      }
     } catch (err) {
       Toast.show(err.message, 'error');
     }
