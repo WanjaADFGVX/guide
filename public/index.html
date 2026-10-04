@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Методический портал и тестирование</title>
+  <meta name="description" content="Шустрый и удобный портал методических материалов и тестов">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+<body>
+
+  <!-- ========================================== -->
+  <!-- HEADER -->
+  <!-- ========================================== -->
+  <header class="site-header">
+    <div class="header-container">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <button class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Меню">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+
+        <a href="#manual" class="logo-group">
+          <div class="logo-icon">M</div>
+          <div class="logo-text">
+            <span class="logo-title" id="brand-title">Методический портал</span>
+            <span class="logo-subtitle" id="brand-subtitle">База знаний и тесты</span>
+          </div>
+        </a>
+      </div>
+
+      <nav class="nav-links">
+        <a href="#manual" class="nav-btn active" data-route="manual">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <span>Методичка</span>
+        </a>
+        <a href="#quizzes" class="nav-btn" data-route="quizzes">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+          <span>Тестирование</span>
+        </a>
+        <a href="#admin" class="nav-btn" data-route="admin">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          <span>Управление</span>
+        </a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="search-trigger-btn" onclick="SearchModule.open()" title="Поиск по сайту (Ctrl+K)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <span>Быстрый поиск...</span>
+          <span class="kbd-shortcut">Ctrl K</span>
+        </button>
+
+        <button class="theme-toggle-btn" onclick="toggleTheme()" title="Переключить тему">
+          <span id="theme-icon">☀️</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- MAIN APP CONTAINER -->
+  <!-- ========================================== -->
+  <main class="app-container">
+
+    <!-- VIEW 1: MANUAL (МЕТОДИЧКА) -->
+    <section id="view-manual" class="view-section active">
+      <!-- Sidebar -->
+      <aside class="manual-sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-title">Содержание</span>
+          <span class="sidebar-progress" id="sidebar-progress-text">0% изучено</span>
+        </div>
+        <nav class="sidebar-nav" id="manual-sidebar-nav">
+          <!-- Dynamically populated -->
+        </nav>
+      </aside>
+
+      <!-- Content -->
+      <div class="manual-content-wrapper">
+        <div class="article-breadcrumbs">
+          <span id="article-sec-name">Раздел</span>
+          <span>/</span>
+          <span id="article-art-name" style="color:var(--text-main);">Глава</span>
+        </div>
+
+        <div class="article-meta-bar">
+          <span class="meta-badge" id="meta-read-time">⏱️ 5 мин</span>
+          <button id="btn-mark-completed" class="mark-completed-btn" onclick="AppState.toggleArticleCompleted()">
+            <span>Отметить как прочитанное</span>
+          </button>
+        </div>
+
+        <article class="article-rendered-body" id="article-body">
+          <!-- Rendered Markdown goes here -->
+        </article>
+
+        <div class="article-footer-nav">
+          <!-- Quiz CTA Box -->
+          <div id="article-quiz-cta" class="quiz-cta-card" style="display:none;"></div>
+
+          <!-- Prev / Next article -->
+          <div class="chapter-nav-buttons">
+            <a id="btn-prev-article" href="#" class="btn-outline">← Предыдущая глава</a>
+            <a id="btn-next-article" href="#" class="btn-outline">Следующая глава →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: QUIZZES HUB (СПИСОК ТЕСТОВ) -->
+    <section id="view-quizzes" class="view-section">
+      <div class="section-title-row">
+        <h1 class="page-main-title">Проверочные тесты</h1>
+        <p class="page-main-desc">Выберите тест для самопроверки и закрепления изученного материала методички.</p>
+      </div>
+      <div class="quizzes-grid" id="quizzes-grid-container">
+        <!-- Rendered Quizzes -->
+      </div>
+    </section>
+
+    <!-- VIEW 3: QUIZ RUNNER (ПРОХОЖДЕНИЕ) -->
+    <section id="view-quiz-runner" class="view-section">
+      <div class="runner-header">
+        <a href="#quizzes" class="runner-back-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          <span>Назад к тестам</span>
+        </a>
+        <div id="runner-timer" class="runner-timer" style="display:none;">
+          <span>⏱️</span>
+          <span id="runner-timer-text">00:00</span>
+        </div>
+      </div>
+
+      <h2 id="runner-quiz-title" style="margin-bottom: 16px; font-size: 1.4rem;">Тест</h2>
+
+      <div class="runner-progress-bar">
+        <div class="runner-progress-fill" id="runner-progress-fill"></div>
+      </div>
+
+      <div class="runner-indicators" id="runner-indicators">
+        <!-- Pills -->
+      </div>
+
+      <div class="question-box">
+        <div class="question-number-tag" id="q-number-tag">Вопрос 1 из 5</div>
+        <h3 class="question-prompt" id="q-prompt-text">Текст вопроса</h3>
+        <div class="options-list" id="q-options-container">
+          <!-- Options -->
+        </div>
+      </div>
+
+      <div class="runner-nav-actions">
+        <button id="btn-prev-q" class="btn-outline" onclick="QuizModule.prevQuestion()">← Назад</button>
+        <button id="btn-next-q" class="btn-primary" onclick="QuizModule.nextQuestion()">Следующий вопрос →</button>
+        <button id="btn-finish-quiz" class="btn-primary" style="display:none; background:var(--success);" onclick="QuizModule.submitQuiz()">Завершить и проверить ✓</button>
+      </div>
+    </section>
+
+    <!-- VIEW 4: QUIZ RESULTS (РЕЗУЛЬТАТЫ) -->
+    <section id="view-quiz-results" class="view-section">
+      <div class="results-summary-card">
+        <div class="results-score-circle" id="results-circle">
+          <span class="score-number" id="results-score-num">0%</span>
+          <span class="score-total" id="results-total-num">0 из 0</span>
+        </div>
+        <h2 class="results-title" id="results-main-title">Результаты теста</h2>
+        <p class="results-subtitle" id="results-main-desc">Описание результатов</p>
+        <div class="results-actions">
+          <button class="btn-outline" onclick="QuizModule.initQuiz(QuizModule.currentQuiz.id)">Попробовать снова</button>
+          <a href="#manual" class="btn-primary">Вернуться к методичке</a>
+        </div>
+      </div>
+
+      <h3 class="breakdown-title">Разбор ответов и пояснения</h3>
+      <div class="breakdown-list" id="results-breakdown-list">
+        <!-- Breakdown cards -->
+      </div>
+    </section>
+
+    <!-- VIEW 5: ADMIN PANEL -->
+    <section id="view-admin" class="view-section">
+      <!-- Login Box -->
+      <div id="admin-auth-container" class="admin-login-box">
+        <div style="font-size: 2.5rem; margin-bottom: 12px;">🔐</div>
+        <h2 style="font-size: 1.5rem; margin-bottom: 8px;">Вход в управление</h2>
+        <p style="color:var(--text-muted); font-size: 0.88rem; margin-bottom: 24px;">Введите пароль администратора для добавления и редактирования материалов</p>
+        
+        <form id="admin-login-form">
+          <div class="form-group">
+            <input type="password" id="admin-password-input" class="form-input" placeholder="Пароль администратора..." required autocomplete="current-password">
+          </div>
+          <button type="submit" class="btn-primary" style="width:100%; justify-content:center; padding:12px;">Войти в админку</button>
+        </form>
+      </div>
+
+      <!-- Dashboard -->
+      <div id="admin-dashboard-container" style="display:none; width:100%;">
+        <div class="admin-header-row">
+          <div>
+            <h1 style="font-size: 1.8rem; font-weight:800;">Управление контентом</h1>
+            <p style="color:var(--text-muted); font-size: 0.9rem;">Добавляйте статьи методички, создавайте тесты и настраивайте систему</p>
+          </div>
+          <button class="btn-outline" onclick="AdminModule.logout()">Выйти из системы</button>
+        </div>
+
+        <div class="admin-nav-tabs">
+          <button class="admin-tab-btn active" data-tab="manual" onclick="AdminModule.switchTab('manual')">📖 Методичка (Разделы и Главы)</button>
+          <button class="admin-tab-btn" data-tab="quizzes" onclick="AdminModule.switchTab('quizzes')">🎯 Тесты и Вопросы</button>
+          <button class="admin-tab-btn" data-tab="settings" onclick="AdminModule.switchTab('settings')">⚙️ Настройки и Резервная копия</button>
+        </div>
+
+        <!-- Tab 1: Manual -->
+        <div id="admin-pane-manual" class="admin-content-pane active">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 style="font-size:1.25rem;">Разделы и главы методички</h2>
+            <button class="btn-primary" onclick="AdminModule.addSectionPrompt()">+ Добавить новый раздел</button>
+          </div>
+          <div id="admin-sections-list"></div>
+        </div>
+
+        <!-- Tab 2: Quizzes -->
+        <div id="admin-pane-quizzes" class="admin-content-pane">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 style="font-size:1.25rem;">Список тестов</h2>
+            <button class="btn-primary" onclick="AdminModule.createQuizPrompt()">+ Создать новый тест</button>
+          </div>
+          <div id="admin-quizzes-list"></div>
+        </div>
+
+        <!-- Tab 3: Settings -->
+        <div id="admin-pane-settings" class="admin-content-pane">
+          <div class="question-box" style="margin-bottom:24px;">
+            <h3 style="margin-bottom:16px;">Общие настройки сайта</h3>
+            <div class="form-group">
+              <label class="form-label">Название портала:</label>
+              <input type="text" id="setting-site-title" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Краткое описание / подзаголовок:</label>
+              <input type="text" id="setting-site-desc" class="form-input">
+            </div>
+            <button class="btn-primary" onclick="AdminModule.saveSettings()">Сохранить настройки</button>
+          </div>
+
+          <div class="question-box" style="margin-bottom:24px;">
+            <h3 style="margin-bottom:16px;">Резервная копия и восстановление</h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin-bottom:16px;">
+              Вы можете в один клик выгрузить все ваши статьи и тесты в один файл JSON или восстановить базу из сохранённого бэкапа.
+            </p>
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+              <button class="btn-outline" onclick="AdminModule.exportBackup()">💾 Скачать бэкап (JSON)</button>
+              <label class="btn-outline" style="cursor:pointer;">
+                📥 Восстановить из файла...
+                <input type="file" accept=".json" style="display:none;" onchange="AdminModule.importBackupFile(this)">
+              </label>
+            </div>
+          </div>
+
+          <div class="question-box">
+            <h3 style="margin-bottom:16px;">Смена пароля администратора</h3>
+            <div class="form-group">
+              <label class="form-label">Текущий пароль:</label>
+              <input type="password" id="pwd-current" class="form-input" placeholder="Текущий пароль">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Новый пароль:</label>
+              <input type="password" id="pwd-new" class="form-input" placeholder="Минимум 5 символов">
+            </div>
+            <button class="btn-primary" onclick="AdminModule.changePassword()">Обновить пароль</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODALS -->
+  <!-- ========================================== -->
+
+  <!-- Modal: Edit Article (Live Split Editor) -->
+  <div id="modal-edit-article" class="modal-overlay">
+    <div class="modal-card" style="max-width: 95vw; width: 1200px;">
+      <div class="modal-header">
+        <h3 style="font-size:1.3rem;">Редактирование статьи методички</h3>
+        <button class="modal-close-btn" onclick="AdminModule.closeArticleModal()">✕</button>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 2fr 1fr; gap:16px; margin-bottom:16px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Заголовок статьи:</label>
+          <input type="text" id="edit-article-title" class="form-input" placeholder="Название темы или инструкции...">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Примерное время чтения:</label>
+          <input type="text" id="edit-article-time" class="form-input" placeholder="5 мин">
+        </div>
+      </div>
+
+      <div class="markdown-editor-toolbar">
+        <button type="button" class="toolbar-btn" onclick="AdminModule.insertMarkdownHelper('bold')"><b>B</b></button>
+        <button type="button" class="toolbar-btn" onclick="AdminModule.insertMarkdownHelper('italic')"><i>I</i></button>
+        <button type="button" class="toolbar-btn" onclick="AdminModule.insertMarkdownHelper('h2')">H2</button>
+        <button type="button" class="toolbar-btn" onclick="AdminModule.insertMarkdownHelper('code')">Код</button>
+        <button type="button" class="toolbar-btn" onclick="AdminModule.insertMarkdownHelper('note')">Вставка (Совет)</button>
+        <button type="button" class="toolbar-btn" onclick="AdminModule.insertMarkdownHelper('table')">Таблица</button>
+        <span style="margin-left:auto; font-size:0.75rem; color:var(--text-dim); align-self:center;">Поддерживается разметка Markdown</span>
+      </div>
+
+      <div class="split-editor-grid">
+        <textarea id="edit-article-content" class="form-textarea editor-textarea" placeholder="Пишите статью здесь в формате Markdown..."></textarea>
+        <div id="article-editor-preview" class="article-rendered-body editor-live-preview"></div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:12px;">
+        <button class="btn-outline" onclick="AdminModule.closeArticleModal()">Отмена</button>
+        <button class="btn-primary" onclick="AdminModule.saveArticle()">Сохранить статью</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Edit Quiz -->
+  <div id="modal-edit-quiz" class="modal-overlay">
+    <div class="modal-card" style="max-width: 900px;">
+      <div class="modal-header">
+        <h3 style="font-size:1.3rem;">Конструктор теста и вопросов</h3>
+        <button class="modal-close-btn" onclick="AdminModule.closeQuizModal()">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Название теста:</label>
+        <input type="text" id="edit-quiz-title" class="form-input" placeholder="Название проверочного теста...">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Описание теста:</label>
+        <input type="text" id="edit-quiz-desc" class="form-input" placeholder="Что проверяет этот тест...">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Ограничение по времени (в минутах, 0 — без лимита):</label>
+        <input type="number" id="edit-quiz-time" class="form-input" min="0" max="180">
+      </div>
+
+      <hr class="md-hr" style="margin:20px 0;">
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h4 style="font-size:1.1rem;">Вопросы теста</h4>
+        <button class="btn-primary" style="padding:6px 14px; font-size:0.85rem;" onclick="AdminModule.addQuestionToQuiz()">+ Добавить вопрос</button>
+      </div>
+
+      <div id="edit-quiz-questions-list"></div>
+
+      <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
+        <button class="btn-outline" onclick="AdminModule.closeQuizModal()">Отмена</button>
+        <button class="btn-primary" onclick="AdminModule.saveQuiz()">Сохранить тест</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Quick Search (Ctrl+K) -->
+  <div id="search-modal" class="modal-overlay">
+    <div class="modal-card search-modal-box">
+      <div class="search-input-wrapper">
+        <svg class="search-icon-inside" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="search-query-input" class="search-input-field" placeholder="Поиск по статьям и тестам (например: SSH, Nginx, Linux)..." autocomplete="off">
+      </div>
+      <div id="search-results" class="search-results-list"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="/js/markdown.js"></script>
+  <script src="/js/quiz.js"></script>
+  <script src="/js/admin.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

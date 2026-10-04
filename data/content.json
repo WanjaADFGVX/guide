@@ -1,0 +1,217 @@
+{
+  "settings": {
+    "siteTitle": "Методический портал и тестирование",
+    "siteSubtitle": "Электронные учебные материалы, практические инструкции и проверочные тесты",
+    "adminPasswordHash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "allowGuestTests": true,
+    "showExplanationsAfterTest": true
+  },
+  "sections": [
+    {
+      "id": "sec-basics",
+      "title": "1. Основы администрирования серверов",
+      "icon": "🖥️",
+      "description": "Базовые понятия, работа в командной строке, пользователи и права доступа.",
+      "order": 1,
+      "articles": [
+        {
+          "id": "art-intro-linux",
+          "title": "Введение в серверные ОС и командную строку",
+          "readTime": "6 мин",
+          "order": 1,
+          "content": "# Введение в серверные ОС и командную строку\n\nСерверные операционные системы (чаще всего на базе Linux, например **Ubuntu Server**, **Debian** или **Rocky Linux**) предназначены для непрерывной работы без графического интерфейса.\n\nОсновное управление сервером осуществляется через **терминал (SSH)**.\n\n---\n\n### 🔑 Ключевые команды навигации\n\n| Команда | Описание |\n| :--- | :--- |\n| `pwd` | Показать текущую рабочую директорию |\n| `ls -la` | Список файлов и папок с правами и скрытыми файлами |\n| `cd /path` | Переход в указанный каталог |\n| `mkdir -p dir/subdir` | Создание директории с подкаталогами |\n| `cp file1 file2` | Копирование файлов |\n| `mv file1 dir/` | Перемещение или переименование |\n| `rm -rf dir` | Удаление каталога (использовать осторожно!) |\n\n> **Важное правило:**\n> Всегда проверяйте текущую директорию командой `pwd` перед выполнением деструктивных операций, особенно с префиксом `sudo`.\n\n```bash\n# Пример обновления пакетов в Ubuntu/Debian:\nsudo apt update && sudo apt upgrade -y\n```\n\n### 🛡️ Права доступа (Permissions)\n\nВ Linux каждый файл и папка имеют владельца, группу и набор прав: **r** (чтение), **w** (запись), **x** (выполнение).\n\nНапример: `chmod 755 script.sh` делает скрипт исполняемым для владельца и доступным на чтение другим пользователям."
+        },
+        {
+          "id": "art-ssh-setup",
+          "title": "Безопасное подключение через SSH и ключи",
+          "readTime": "8 мин",
+          "order": 2,
+          "content": "# Безопасное подключение через SSH\n\nПротокол **SSH (Secure Shell)** обеспечивает защищённый зашифрованный канал для управления удалённым сервером по стандартному порту **22**.\n\n### 1. Генерация ключей на локальном ПК\nВместо ввода пароля рекомендуется использовать криптографические ключи **Ed25519**:\n\n```bash\nssh-keygen -t ed25519 -C \"admin@my-server\"\n```\n\nЭто создаст два файла:\n1. `~/.ssh/id_ed25519` — приватный ключ (хранить строго в секрете!)\n2. `~/.ssh/id_ed25519.pub` — публичный ключ (копируется на сервер)\n\n### 2. Копирование ключа на сервер\n```bash\nssh-copy-id user@your-server-ip\n```\n\n### 3. Базовая настройка `/etc/ssh/sshd_config`\n\nДля усиления безопасности серверов рекомендуется отключить вход по паролю и вход под root:\n\n```ini\nPermitRootLogin no\nPasswordAuthentication no\nPubkeyAuthentication yes\n```\n\nПосле изменения файла не забудьте перезагрузить службу:\n```bash\nsudo systemctl restart sshd\n```"
+        }
+      ]
+    },
+    {
+      "id": "sec-web",
+      "title": "2. Веб-серверы и развёртывание сайтов",
+      "icon": "🌐",
+      "description": "Настройка Nginx, SSL-сертификаты Let's Encrypt, запуск приложений и проксирование.",
+      "order": 2,
+      "articles": [
+        {
+          "id": "art-nginx-basics",
+          "title": "Конфигурация Nginx в роли Reverse Proxy",
+          "readTime": "7 мин",
+          "order": 1,
+          "content": "# Конфигурация Nginx в роли Reverse Proxy\n\n**Nginx** — один из самых быстрых и легковесных веб-серверов в мире. Он часто используется как обратный прокси (reverse proxy), принимая внешние запросы от браузеров и перенаправляя их внутреннему приложению (Node.js, Python, Go).\n\n### Пример конфигурации виртуального хоста\nФайл `/etc/nginx/sites-available/mysite`:\n\n```nginx\nserver {\n    listen 80;\n    server_name example.com www.example.com;\n\n    # Проксирование на локальный порт приложения\n    location / {\n        proxy_pass http://127.0.0.1:3000;\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection 'upgrade';\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n        proxy_cache_bypass $http_upgrade;\n    }\n}\n```\n\n### Активация и проверка\n```bash\nsudo ln -s /etc/nginx/sites-available/mysite /etc/nginx/sites-enabled/\nsudo nginx -t\nsudo systemctl reload nginx\n```\n\n> **Совет:** `nginx -t` обязательно запускать перед каждой перезагрузкой, чтобы исключить синтаксические ошибки."
+        },
+        {
+          "id": "art-ssl-certbot",
+          "title": "Установка бесплатного SSL-сертификата Let's Encrypt",
+          "readTime": "5 мин",
+          "order": 2,
+          "content": "# Бесплатный SSL-сертификат с Let's Encrypt и Certbot\n\nСертификат SSL/TLS необходим для включения шифрования HTTPS, отображения замка в браузере и защиты данных пользователей.\n\n### Установка Certbot\n```bash\nsudo apt install certbot python3-certbot-nginx -y\n```\n\n### Выпуск сертификата для Nginx\n```bash\nsudo certbot --nginx -d example.com -d www.example.com\n```\n\nCertbot автоматически:\n- Создаст ключи и валидирует домен\n- Отредактирует конфигурацию Nginx для HTTPS (порт 443)\n- Настроит автоматический редирект с HTTP на HTTPS\n- Добавит таймер автопродления (`certbot renew`)"
+        }
+      ]
+    },
+    {
+      "id": "sec-devops",
+      "title": "3. Поддержание работы: PM2 и Systemd",
+      "icon": "⚡",
+      "description": "Автозапуск приложений после перезагрузки сервера, мониторинг и логирование.",
+      "order": 3,
+      "articles": [
+        {
+          "id": "art-pm2-guide",
+          "title": "Менеджер процессов PM2: автозапуск и мониторинг",
+          "readTime": "5 мин",
+          "order": 1,
+          "content": "# Менеджер процессов PM2\n\nЧтобы сайт работал 24/7 и автоматически перезапускался при сбоях или перезагрузке сервера, используется менеджер процессов **PM2**.\n\n### Установка PM2\n```bash\nsudo npm install -g pm2\n```\n\n### Запуск сайта\n```bash\ncd /var/www/testsite\npm2 start server.js --name \"my-portal\"\n```\n\n### Полезные команды\n- `pm2 list` — статус всех запущенных процессов\n- `pm2 logs my-portal` — просмотр логов в реальном времени\n- `pm2 restart my-portal` — перезагрузка сервиса\n- `pm2 stop my-portal` — остановка\n\n### Автозапуск при перезагрузке сервера\n```bash\npm2 startup\n# Выполните команду, которую выведет PM2 (через sudo env PATH...)\npm2 save\n```"
+        }
+      ]
+    }
+  ],
+  "quizzes": [
+    {
+      "id": "quiz-linux-basics",
+      "title": "Тест: Основы администрирования и терминала Linux",
+      "description": "Проверьте свои знания базовых команд, управления правами и SSH подключений.",
+      "sectionId": "sec-basics",
+      "timeLimit": 10,
+      "questions": [
+        {
+          "id": "q1-1",
+          "question": "Какая команда выводит текущую рабочую директорию в терминале Linux?",
+          "type": "single",
+          "options": [
+            "dir",
+            "pwd",
+            "whereami",
+            "showpath"
+          ],
+          "correctAnswers": [
+            1
+          ],
+          "explanation": "Команда `pwd` расшифровывается как 'Print Working Directory' и выводит полный путь к текущему каталогу."
+        },
+        {
+          "id": "q1-2",
+          "question": "Какой стандартный сетевой порт используется для протокола безопасного терминального доступа SSH?",
+          "type": "single",
+          "options": [
+            "21",
+            "22",
+            "80",
+            "443"
+          ],
+          "correctAnswers": [
+            1
+          ],
+          "explanation": "Порт 21 — это FTP, 80 — HTTP, 443 — HTTPS, а порт 22 по умолчанию отведен под службу SSH."
+        },
+        {
+          "id": "q1-3",
+          "question": "Какие файлы создаются при генерации пары SSH-ключей утилитой ssh-keygen?",
+          "type": "multiple",
+          "options": [
+            "Приватный ключ (хранится на локальном компьютере и никому не передается)",
+            "Публичный ключ с расширением .pub (копируется на сервер в authorized_keys)",
+            "Сертификат безопасности для Nginx",
+            "Файл паролей shadow"
+          ],
+          "correctAnswers": [
+            0,
+            1
+          ],
+          "explanation": "При генерации создается пара: закрытый (секретный) ключ для подтверждения личности и открытый (.pub) для размещения на сервере."
+        },
+        {
+          "id": "q1-4",
+          "question": "Что означает право доступа 755 (chmod 755) для исполняемого файла?",
+          "type": "single",
+          "options": [
+            "Все пользователи имеют полные права на запись и удаление",
+            "Владелец имеет полные права (чтение, запись, выполнение), группа и остальные — только чтение и выполнение",
+            "Только суперпользователь root может запустить этот файл",
+            "Файл заблокирован от любых изменений"
+          ],
+          "correctAnswers": [
+            1
+          ],
+          "explanation": "7 (4+2+1) для владельца (rwx), 5 (4+1) для группы (r-x) и 5 (4+1) для всех остальных (r-x)."
+        },
+        {
+          "id": "q1-5",
+          "question": "Напишите команду Linux для вывода пути к текущей рабочей директории (аббревиатура из 3 латинских букв):",
+          "type": "text",
+          "acceptableAnswers": [
+            "pwd",
+            "pwd -P",
+            "pwd -L"
+          ],
+          "explanation": "Команда `pwd` (расшифровывается как Print Working Directory) выводит абсолютный путь к текущей папке."
+        }
+      ]
+    },
+    {
+      "id": "quiz-web-servers",
+      "title": "Тест: Веб-сервер Nginx и SSL/TLS",
+      "description": "Тест по маршрутизации запросов, проксированию Node.js приложений и сертификатам безопасности.",
+      "sectionId": "sec-web",
+      "timeLimit": 8,
+      "questions": [
+        {
+          "id": "q2-1",
+          "question": "С помощью какой директивы в Nginx настраивается перенаправление входящих запросов на порт бэкенд-приложения (например, Node.js)?",
+          "type": "single",
+          "options": [
+            "proxy_pass",
+            "forward_to",
+            "redirect_backend",
+            "listen_proxy"
+          ],
+          "correctAnswers": [
+            0
+          ],
+          "explanation": "Директива `proxy_pass http://127.0.0.1:3000;` передает обработку запроса внешнему или внутреннему веб-серверу приложений."
+        },
+        {
+          "id": "q2-2",
+          "question": "Какую команду следует выполнить перед перезагрузкой Nginx, чтобы убедиться в отсутствии синтаксических ошибок в конфигах?",
+          "type": "single",
+          "options": [
+            "sudo nginx -test",
+            "sudo nginx -t",
+            "sudo nginx --validate",
+            "sudo check-nginx"
+          ],
+          "correctAnswers": [
+            1
+          ],
+          "explanation": "`nginx -t` тестирует файлы конфигурации на синтаксис и сообщает о любых ошибках без риска поломки работающего сервиса."
+        },
+        {
+          "id": "q2-3",
+          "question": "Какой сетевой порт используется для шифрованного трафика HTTPS?",
+          "type": "single",
+          "options": [
+            "80",
+            "8080",
+            "443",
+            "3000"
+          ],
+          "correctAnswers": [
+            2
+          ],
+          "explanation": "Стандартный порт для HTTPS — 443, а порт 80 — незашифрованный HTTP."
+        }
+      ]
+    },
+    {
+      "id": "quiz-1791135507097",
+      "title": "Тест",
+      "description": "Тест",
+      "timeLimit": 0,
+      "questions": []
+    }
+  ]
+}

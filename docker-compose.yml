@@ -1,0 +1,12 @@
+services:
+  portal:
+    build: .
+    container_name: study-portal
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - ADMIN_PASSWORD=admin123
+    volumes:
+      - ./data:/app/data

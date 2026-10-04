@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# Backups & temporary database files
+data/*.tmp
+data/*.bak
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE & editors
+.vscode/
+.idea/
+*.swp
+*.swo
