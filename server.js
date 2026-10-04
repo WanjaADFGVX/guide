@@ -6,7 +6,6 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
-app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'content.json');
@@ -106,7 +105,6 @@ function verifyAdmin(req, res, next) {
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 15,
-  validate: { xForwardedForHeader: false },
   message: { error: 'Слишком много попыток входа. Попробуйте через 15 минут.' }
 });
 
